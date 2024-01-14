@@ -35,4 +35,5 @@ type CaptureManager interface {
 	Broadcast() BroadcastManager
 	Audio() StreamSinkManager
 	Video() StreamSinkManager
+	Videosd() StreamSinkManager
 }

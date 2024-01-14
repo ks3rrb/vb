@@ -39,6 +39,10 @@ func (h *MessageHandler) signalRemoteAnswer(id string, session types.Session, pa
 		return err
 	}
 
+	// if err := session.SetQuality(payload.Quality); err != nil {
+	// 	return err
+	// }
+
 	if err := session.SignalRemoteAnswer(payload.SDP); err != nil {
 		return err
 	}

@@ -6,6 +6,8 @@ import (
 	"strconv"
 
 	"github.com/pion/webrtc/v3"
+
+	"encoding/json"
 )
 
 const (
@@ -38,10 +40,148 @@ type PayloadKey struct {
 	Key uint64 // TODO: uint32
 }
 
-func (manager *WebRTCManager) handle(id string, msg webrtc.DataChannelMessage) error {
+// Your data structure in Go
+type PayloadMzelo struct {
+	Event string `json:"event"`
+	Value string `json:"value"`
+}
+
+// Decode JSON string to Go object
+func jsonToStruct(jsonString string) (*PayloadMzelo, error) {
+	var obj PayloadMzelo
+	err := json.Unmarshal([]byte(jsonString), &obj)
+	if err != nil {
+		return nil, err
+	}
+	return &obj, nil
+}
+
+// var mu = sync.Mutex{}
+
+func (manager *WebRTCManager) handle(id string, msg webrtc.DataChannelMessage, connection *webrtc.PeerConnection, videoTrack *webrtc.TrackLocalStaticSample, videosdTrack *webrtc.TrackLocalStaticSample) error {
 	if (!manager.config.ImplicitControl && !manager.sessions.IsHost(id)) || (manager.config.ImplicitControl && !manager.sessions.CanControl(id)) {
 		return nil
 	}
+
+	// manager.logger.Info().Msgf("data message isString %s", msg.IsString)
+
+	if (msg.IsString) {
+		// Decode JSON string to Go object
+		obj, err := jsonToStruct(string(msg.Data))
+		if err != nil {
+			manager.logger.Info().Msgf("Error decoding JSON: %s", err)
+			return nil
+		}
+
+		// Use the decoded object
+		manager.logger.Info().Msgf("Decoded Object: %s", obj)
+
+		if obj.Event=="quality435345" {
+
+			// connection.mu.Lock()
+			// defer connection.mu.Unlock()
+
+			// Find the transceiver with the existing video track
+			var videoTransceiver *webrtc.RTPTransceiver
+			for _, transceiver := range connection.GetTransceivers() {
+				if transceiver.Sender() != nil && transceiver.Sender().Track() != nil && transceiver.Sender().Track().Kind() == webrtc.RTPCodecTypeVideo {
+					videoTransceiver = transceiver
+					break
+				}
+			}
+
+			if videoTransceiver == nil {
+				manager.logger.Info().Msgf("existing video track not found")
+				return nil
+			}
+
+			// Check the transceiver state before switching
+			if videoTransceiver.Direction() != webrtc.RTPTransceiverDirectionSendrecv {
+				manager.logger.Info().Msgf("video transceiver not in sendrecv state")
+				return nil
+			}
+		
+			// Log the current transceiver state before switching
+			manager.logger.Info().Msgf("Current video transceiver state: %s", videoTransceiver.Direction().String())
+
+			// // Remove the existing video track
+			// if err := videoTransceiver.Sender().RemoveTrack(); err != nil {
+			// 	manager.logger.Info().Msgf("failed to remove video track: %w", err)
+			// 	return nil
+			// }
+
+			// Remove the existing video track
+			// if err := connection.RemoveTrack(videoTransceiver.Sender()); err != nil {
+			// 	manager.logger.Info().Msgf("failed to remove video track: %w", err)
+			// 	return nil
+			// }
+	
+
+			// Remove the existing video track by replacing it with an empty track
+			// emptyTrack, err := webrtc.NewTrackLocalStaticRTP(manager.capture.Video().Codec().Capability, "empty", "empty")
+			// if err != nil {
+			// 	manager.logger.Info().Msgf("failed to create empty track: %w", err)
+			// 	return nil
+			// }
+			
+			// if err := videoTransceiver.Sender().ReplaceTrack(emptyTrack); err != nil {
+			// 	manager.logger.Info().Msgf("failed to switch video track: %w", err)
+			// 	return nil
+			// }
+	
+			// if obj.Value == "HD" {
+			// 	// Replace the empty track with the HD video track
+			// 	if err := videoTransceiver.Sender().ReplaceTrack(videoTrack); err != nil {
+			// 		manager.logger.Info().Msgf("failed to switch video track: %w", err)
+			// 	}
+			// } else if obj.Value == "SD" {
+			// 	// Replace the empty track with the SD video track
+			// 	if err := videoTransceiver.Sender().ReplaceTrack(videosdTrack); err != nil {
+			// 		manager.logger.Info().Msgf("failed to switch video track: %w", err)
+			// 	}
+			// } else {
+			// 	// Handle other cases if needed
+			// }
+	
+			// if obj.Value == "HD" {
+			// 	// Add the HD video track
+			// 	if _, err := connection.AddTrack(videoTrack); err != nil {
+			// 		manager.logger.Info().Msgf("failed to add HD video track: %w", err)
+			// 		return nil
+			// 	}
+			// } else if obj.Value == "SD" {
+			// 	// Add the SD video track
+			// 	if _, err := connection.AddTrack(videosdTrack); err != nil {
+			// 		manager.logger.Info().Msgf("failed to add SD video track: %w", err)
+			// 		return nil
+			// 	}
+			// } else {
+			// 	// Handle other cases if needed
+			// }
+	
+			// manager.logger.Info().Msgf("Video track switched successfully.")
+			
+			// if obj.Value == "HD" {
+			// 	// Replace the existing video track with the new one
+			// 	if err := videoTransceiver.Sender().ReplaceTrack(videoTrack); err != nil {
+			// 		manager.logger.Info().Msgf("failed to switch video track: %w", err)
+			// 	}
+			// } else if (obj.Value == "SD") {
+			// 	// Replace the existing video track with the new one
+			// 	if err := videoTransceiver.Sender().ReplaceTrack(videosdTrack); err != nil {
+			// 		manager.logger.Info().Msgf("failed to switch video track: %w", err)
+			// 	}
+			// } else {
+				
+			// }
+
+			manager.logger.Info().Msgf("Video track switched successfully. New transceiver state: %s", videoTransceiver.Direction().String())
+
+
+		}
+		return nil
+	}
+
 
 	buffer := bytes.NewBuffer(msg.Data)
 	header := &PayloadHeader{}

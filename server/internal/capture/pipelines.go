@@ -140,9 +140,9 @@ func NewVideoPipeline(rtpCodec codec.RTPCodec, display string, pipelineSrc strin
 		}
 
 		vbvbuf := uint(1000)
-		if bitrate > 1000 {
+		// if bitrate > 1000 {
 			vbvbuf = bitrate
-		}
+		// }
 
 		if hwenc == config.HwEncVAAPI {
 			if err := gst.CheckPlugins([]string{"vaapi"}); err != nil {
@@ -172,7 +172,7 @@ func NewVideoPipeline(rtpCodec codec.RTPCodec, display string, pipelineSrc strin
 				return "", err
 			}
 
-			pipelineStr = fmt.Sprintf(videoSrc+"video/x-raw,format=NV12 ! x264enc threads=4 bitrate=%d key-int-max=60 vbv-buf-capacity=%d byte-stream=true tune=zerolatency speed-preset=veryfast ! video/x-h264,stream-format=byte-stream,profile=constrained-baseline"+pipelineStr, display, fps, bitrate, vbvbuf)
+			pipelineStr = fmt.Sprintf(videoSrc+"video/x-raw,format=NV12 ! x264enc threads=4 bitrate=%d key-int-max=60 vbv-buf-capacity=%d byte-stream=true tune=zerolatency speed-preset=veryfast ! video/x-h264,stream-format=byte-stream,profile=high"+pipelineStr, display, fps, bitrate, vbvbuf)
 		}
 	default:
 		return "", fmt.Errorf("unknown codec %s", rtpCodec.Name)

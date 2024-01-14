@@ -34,6 +34,7 @@ func New(sessions types.SessionManager, capture types.CaptureManager, desktop ty
 type WebRTCManager struct {
 	logger     zerolog.Logger
 	videoTrack *webrtc.TrackLocalStaticSample
+	videosdTrack *webrtc.TrackLocalStaticSample
 	audioTrack *webrtc.TrackLocalStaticSample
 	sessions   types.SessionManager
 	capture    types.CaptureManager
@@ -91,6 +92,31 @@ func (manager *WebRTCManager) Start() {
 			err := manager.videoTrack.WriteSample(media.Sample(sample))
 			if err != nil && errors.Is(err, io.ErrClosedPipe) {
 				manager.logger.Warn().Err(err).Msg("video pipeline failed to write")
+			}
+		}
+	}()
+
+	//
+	// videosd
+	//
+
+	videosdCodec := manager.capture.Videosd().Codec()
+	manager.videosdTrack, err = webrtc.NewTrackLocalStaticSample(videosdCodec.Capability, "videosd", "stream")
+	if err != nil {
+		manager.logger.Panic().Err(err).Msg("unable to create videosd track")
+	}
+
+	go func() {
+		for {
+			sample, ok := <-manager.capture.Videosd().GetSampleChannel()
+			if !ok {
+				manager.logger.Debug().Msg("videosd capture channel is closed")
+				continue
+			}
+
+			err := manager.videosdTrack.WriteSample(media.Sample(sample))
+			if err != nil && errors.Is(err, io.ErrClosedPipe) {
+				manager.logger.Warn().Err(err).Msg("videosd pipeline failed to write")
 			}
 		}
 	}()
@@ -207,6 +233,9 @@ func (manager *WebRTCManager) CreatePeer(id string, session types.Session) (type
 		configuration.ICEServers = manager.config.ICEServers
 	}
 
+
+	manager.logger.Info().Msgf("session %s", session.Admin());
+
 	// Create new peer connection
 	connection, err := manager.api.NewPeerConnection(configuration)
 	if err != nil {
@@ -223,7 +252,7 @@ func (manager *WebRTCManager) CreatePeer(id string, session types.Session) (type
 
 	connection.OnDataChannel(func(d *webrtc.DataChannel) {
 		d.OnMessage(func(msg webrtc.DataChannelMessage) {
-			if err = manager.handle(id, msg); err != nil {
+			if err = manager.handle(id, msg, connection, manager.videoTrack, manager.videosdTrack); err != nil {
 				manager.logger.Warn().Err(err).Msg("data handle failed")
 			}
 		})
@@ -237,7 +266,18 @@ func (manager *WebRTCManager) CreatePeer(id string, session types.Session) (type
 			Msg("connection state has changed")
 	})
 
-	rtpVideo, err := connection.AddTrack(manager.videoTrack)
+	var trackToAdd *webrtc.TrackLocalStaticSample
+
+
+	manager.logger.Info().Msgf("Quality: %s",session.Sd())
+	if session.Sd() {
+		trackToAdd = manager.videosdTrack
+	} else {
+		trackToAdd = manager.videoTrack
+	}
+	
+
+	rtpVideo, err := connection.AddTrack(trackToAdd)
 	if err != nil {
 		return nil, err
 	}

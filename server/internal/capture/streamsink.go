@@ -53,6 +53,7 @@ func (manager *StreamSinkManagerCtx) Codec() codec.RTPCodec {
 }
 
 func (manager *StreamSinkManagerCtx) start() error {
+	// manager.logger.Info().Msgf("streamsink start called %s",manager.listeners);
 	if manager.listeners == 0 {
 		err := manager.createPipeline()
 		if err != nil && !errors.Is(err, types.ErrCapturePipelineAlreadyExists) {

@@ -32,10 +32,11 @@ type SessionManager struct {
 	controlLocked bool
 }
 
-func (manager *SessionManager) New(id string, admin bool, socket types.WebSocket) types.Session {
+func (manager *SessionManager) New(id string, admin bool, socket types.WebSocket, sd bool) types.Session {
 	session := &Session{
 		id:        id,
 		admin:     admin,
+		sd: sd,
 		manager:   manager,
 		socket:    socket,
 		logger:    manager.logger.With().Str("id", id).Logger(),
@@ -46,6 +47,7 @@ func (manager *SessionManager) New(id string, admin bool, socket types.WebSocket
 	manager.members[id] = session
 	manager.capture.Audio().AddListener()
 	manager.capture.Video().AddListener()
+	manager.capture.Videosd().AddListener()
 	manager.mu.Unlock()
 
 	manager.eventsChannel <- types.SessionEvent{
@@ -174,6 +176,7 @@ func (manager *SessionManager) Destroy(id string) {
 
 		manager.capture.Audio().RemoveListener()
 		manager.capture.Video().RemoveListener()
+		manager.capture.Videosd().RemoveListener()
 		manager.mu.Unlock()
 
 		manager.eventsChannel <- types.SessionEvent{

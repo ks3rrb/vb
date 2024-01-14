@@ -1,6 +1,7 @@
 package capture
 
 import (
+	"m1k1o/neko/internal/types/codec"
 	"errors"
 
 	"github.com/rs/zerolog"
@@ -18,10 +19,12 @@ type CaptureManagerCtx struct {
 	broadcast *BroacastManagerCtx
 	audio     *StreamSinkManagerCtx
 	video     *StreamSinkManagerCtx
+	videosd   *StreamSinkManagerCtx
 }
 
 func New(desktop types.DesktopManager, config *config.Capture) *CaptureManagerCtx {
 	logger := log.With().Str("module", "capture").Logger()
+	// logger.Info().Msgf("config %s", config);
 
 	return &CaptureManagerCtx{
 		logger:  logger,
@@ -34,15 +37,24 @@ func New(desktop types.DesktopManager, config *config.Capture) *CaptureManagerCt
 		audio: streamSinkNew(config.AudioCodec, func() (string, error) {
 			return NewAudioPipeline(config.AudioCodec, config.AudioDevice, config.AudioPipeline, config.AudioBitrate)
 		}, "audio"),
-		video: streamSinkNew(config.VideoCodec, func() (string, error) {
+		video: streamSinkNew(codec.H264(), func() (string, error) {
 			// use screen fps as default
 			fps := desktop.GetScreenSize().Rate
 			// if max fps is set, cap it to that value
 			if config.VideoMaxFPS > 0 && config.VideoMaxFPS < fps {
 				fps = config.VideoMaxFPS
 			}
-			return NewVideoPipeline(config.VideoCodec, config.Display, config.VideoPipeline, fps, config.VideoBitrate, config.VideoHWEnc)
+			return NewVideoPipeline(codec.H264(), config.Display, config.VideoPipeline, fps, config.VideoBitrate, config.VideoHWEnc)
 		}, "video"),
+		videosd: streamSinkNew(codec.H264(), func() (string, error) {
+			// use screen fps as default
+			fps := desktop.GetScreenSize().Rate
+			// if max fps is set, cap it to that value
+			if config.VideoMaxFPS > 0 && config.VideoMaxFPS < fps {
+				fps = config.VideoMaxFPS
+			}
+			return NewVideoPipeline(codec.H264(), config.Display, config.VideoPipeline, fps, 1200, config.VideoHWEnc)
+		}, "videosd"),
 	}
 }
 
@@ -64,8 +76,14 @@ func (manager *CaptureManagerCtx) Start() {
 			if before {
 				// before screen size change, we need to destroy all pipelines
 
+				manager.logger.Info().Msg("before screen size change, we need to destroy all pipelines")
+
 				if manager.video.Started() {
 					manager.video.destroyPipeline()
+				}
+
+				if manager.videosd.Started() {
+					manager.videosd.destroyPipeline()
 				}
 
 				if manager.broadcast.Started() {
@@ -74,10 +92,19 @@ func (manager *CaptureManagerCtx) Start() {
 			} else {
 				// after screen size change, we need to recreate all pipelines
 
+				manager.logger.Info().Msg("after screen size change, we need to recreate all pipelines")
+
 				if manager.video.Started() {
 					err := manager.video.createPipeline()
 					if err != nil && !errors.Is(err, types.ErrCapturePipelineAlreadyExists) {
 						manager.logger.Panic().Err(err).Msg("unable to recreate video pipeline")
+					}
+				}
+
+				if manager.videosd.Started() {
+					err := manager.videosd.createPipeline()
+					if err != nil && !errors.Is(err, types.ErrCapturePipelineAlreadyExists) {
+						manager.logger.Panic().Err(err).Msg("unable to recreate videosd pipeline")
 					}
 				}
 
@@ -99,6 +126,7 @@ func (manager *CaptureManagerCtx) Shutdown() error {
 
 	manager.audio.shutdown()
 	manager.video.shutdown()
+	manager.videosd.shutdown()
 
 	return nil
 }
@@ -113,4 +141,8 @@ func (manager *CaptureManagerCtx) Audio() types.StreamSinkManager {
 
 func (manager *CaptureManagerCtx) Video() types.StreamSinkManager {
 	return manager.video
+}
+
+func (manager *CaptureManagerCtx) Videosd() types.StreamSinkManager {
+	return manager.videosd
 }

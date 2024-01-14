@@ -287,6 +287,8 @@ func (ws *WebSocketHandler) Upgrade(w http.ResponseWriter, r *http.Request) erro
 		return nil
 	}
 
+	sd, err := ws.getsd(r)
+
 	socket := &WebSocket{
 		id:         id,
 		ws:         ws,
@@ -310,7 +312,7 @@ func (ws *WebSocketHandler) Upgrade(w http.ResponseWriter, r *http.Request) erro
 		return nil
 	}
 
-	ws.sessions.New(id, admin, socket)
+	ws.sessions.New(id, admin, socket, sd)
 
 	ws.logger.
 		Debug().
@@ -381,6 +383,23 @@ func (ws *WebSocketHandler) authenticate(r *http.Request) (bool, error) {
 	}
 
 	return ws.IsAdmin(passwords[0])
+}
+
+func (ws *WebSocketHandler) getsd(r *http.Request) (bool, error) {
+	sds, ok := r.URL.Query()["quality"]
+	if !ok || len(sds[0]) < 1 {
+		return false, fmt.Errorf("no sd provided")
+	}
+
+	if sds[0] == "SD" {
+		return true, nil
+	}
+
+	if sds[0] == "HD" {
+		return false, nil
+	}
+
+	return false, fmt.Errorf("invalid sd")
 }
 
 func (ws *WebSocketHandler) handle(connection *websocket.Conn, id string) {

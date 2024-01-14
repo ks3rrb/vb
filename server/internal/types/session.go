@@ -26,6 +26,7 @@ type SessionEvent struct {
 type Session interface {
 	ID() string
 	Name() string
+	Sd() bool
 	Admin() bool
 	Muted() bool
 	Connected() bool
@@ -47,7 +48,7 @@ type Session interface {
 }
 
 type SessionManager interface {
-	New(id string, admin bool, socket WebSocket) Session
+	New(id string, admin bool, socket WebSocket, sd bool) Session
 	HasHost() bool
 	IsHost(id string) bool
 	SetHost(id string) error

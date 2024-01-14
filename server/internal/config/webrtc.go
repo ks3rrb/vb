@@ -130,5 +130,5 @@ func (s *WebRTC) Set() {
 	}
 
 	// TODO: Should be moved to session config.
-	s.ImplicitControl = viper.GetBool("implicit_control")
+	s.ImplicitControl = true;//viper.GetBool("implicit_control")
 }
